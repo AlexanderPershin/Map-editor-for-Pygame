@@ -34,7 +34,7 @@ class Game:
         self.screen_width, self.screen_height = self.screen.get_size()
         self.screen_rect = self.screen.get_rect()
 
-        pygame.display.set_caption("Character Generator")
+        pygame.display.set_caption("Map editor integration")
         self.clock = pygame.time.Clock()
 
         self._load_font()
