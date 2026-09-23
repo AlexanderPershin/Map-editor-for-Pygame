@@ -34,17 +34,18 @@ class Game:
         self.screen_width, self.screen_height = self.screen.get_size()
         self.screen_rect = self.screen.get_rect()
 
-        pygame.display.set_caption("Map editor")
+        pygame.display.set_caption("Character Generator")
         self.clock = pygame.time.Clock()
 
         self._load_font()
         self._load_images()
         self._load_sounds()
 
-        self.map_objects, self.collision_rects = self._load_map_objects()
+        self.all_sprites = pygame.sprite.LayeredUpdates()
 
-        self.all_sprites = pygame.sprite.Group()
-        self.all_sprites.add(*self.map_objects)
+        self._load_map_objects(self.all_sprites)
+
+        self.collision_rects = self._load_collisions()
 
         self.player = Player(
             pygame.Vector2(
@@ -63,35 +64,33 @@ class Game:
     def __exit__(self, *args):
         pygame.quit()
 
-    def _load_map_objects(
-        self,
-    ) -> tuple[pygame.sprite.Group, list[pygame.Rect]]:
+    def _load_collisions(self) -> list[pygame.Rect]:
+        layer = self.tmx_data.get_layer_by_name("Collisions")
+        if layer is None:
+            return []
+
+        return [
+            pygame.Rect(int(o.x), int(o.y), int(o.width), int(o.height))
+            for o in layer
+        ]
+
+    def _load_map_objects(self, group: pygame.sprite.Group) -> None:
         things = self.tmx_data.get_layer_by_name("Things")
         masks = self.tmx_data.get_layer_by_name("ObjectMasks")
-        collisions = self.tmx_data.get_layer_by_name("Collisions")
 
-        tw = self.tmx_data.tilewidth
-        th = self.tmx_data.tileheight
+        if things is None or masks is None:
+            return
+
+        thing_width = self.tmx_data.tilewidth
+        thing_height = self.tmx_data.tileheight
 
         tiles: dict[tuple[int, int], pygame.Surface] = {}
-        if things is not None:
-            for x, y, gid in things:
-                if gid == 0:
-                    continue
-                img = self.tmx_data.get_tile_image_by_gid(gid)
-                if img is not None:
-                    tiles[(x, y)] = img
-
-        collision_rects: list[pygame.Rect] = []
-        if collisions is not None:
-            for obj in collisions:
-                collision_rects.append(pygame.Rect(
-                    int(obj.x), int(obj.y), int(obj.width), int(obj.height),
-                ))
-
-        map_objects = pygame.sprite.Group()
-        if masks is None:
-            return map_objects, collision_rects
+        for x, y, gid in things:
+            if gid == 0:
+                continue
+            img = self.tmx_data.get_tile_image_by_gid(gid)
+            if img is not None:
+                tiles[(x, y)] = img
 
         for mask_obj in masks:
             mask = pygame.Rect(
@@ -99,10 +98,10 @@ class Game:
                 int(mask_obj.width), int(mask_obj.height),
             )
 
-            gx0 = mask.left // tw
-            gx1 = (mask.right - 1) // tw
-            gy0 = mask.top // th
-            gy1 = (mask.bottom - 1) // th
+            gx0 = mask.left // thing_width
+            gx1 = (mask.right - 1) // thing_width
+            gy0 = mask.top // thing_height
+            gy1 = (mask.bottom - 1) // thing_height
 
             cells = [
                 (gx, gy)
@@ -110,8 +109,8 @@ class Game:
                 for gx in range(gx0, gx1 + 1)
                 if (gx, gy) in tiles
             ]
+
             if not cells:
-                print(f"[warn] mask без тайлов: {mask}")
                 continue
 
             min_gx = min(c[0] for c in cells)
@@ -119,24 +118,18 @@ class Game:
             min_gy = min(c[1] for c in cells)
             max_gy = max(c[1] for c in cells)
 
-            w = (max_gx - min_gx + 1) * tw
-            h = (max_gy - min_gy + 1) * th
+            w = (max_gx - min_gx + 1) * thing_width
+            h = (max_gy - min_gy + 1) * thing_height
             image = pygame.Surface((w, h), pygame.SRCALPHA)
 
             for gx, gy in cells:
                 image.blit(
                     tiles[(gx, gy)],
-                    ((gx - min_gx) * tw, (gy - min_gy) * th),
+                    ((gx - min_gx) * thing_width, (gy - min_gy) * thing_height),
                 )
 
-            draw_rect = pygame.Rect(min_gx * tw, min_gy * th, w, h)
-
-            map_objects.add(
-                MapObject(image, draw_rect, depth_y=mask.bottom)
-            )
-
-        return map_objects, collision_rects
-
+            draw_rect = pygame.Rect(min_gx * thing_width, min_gy * thing_height, w, h)
+            group.add(MapObject(image, draw_rect, depth_y=mask.bottom))
 
     def _load_font(self) -> None:
         self.font = pygame.font.Font(
@@ -170,6 +163,11 @@ class Game:
     def update(self):
         self.all_sprites.update(self.dt, target=self.player)
 
+        for s in self.all_sprites:
+            self.all_sprites.change_layer(
+                s, getattr(s, "depth", s.rect.centery)
+            )
+
     def draw(self):
         for layer in self.tmx_data.visible_layers:
             if isinstance(layer, pytmx.TiledTileLayer):
@@ -184,11 +182,5 @@ class Game:
                              y * self.tmx_data.tileheight),
                         )
 
-        drawables = sorted(
-            self.all_sprites,
-            key=lambda s: getattr(s, "depth", s.rect.bottom),
-        )
-        for s in drawables:
-            self.screen.blit(s.image, s.rect)
-
+        self.all_sprites.draw(self.screen)
         pygame.display.flip()
