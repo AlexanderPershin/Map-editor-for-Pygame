@@ -161,7 +161,7 @@ class Game:
                         self.running = False
 
     def update(self):
-        self.all_sprites.update(self.dt, target=self.player)
+        self.all_sprites.update(self.dt)
 
         for s in self.all_sprites:
             self.all_sprites.change_layer(

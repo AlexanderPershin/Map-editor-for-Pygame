@@ -64,6 +64,9 @@ class Input:
 
 
 class Player(pygame.sprite.Sprite):
+    FEET_OFFSET = 32
+    FEET_SIZE = (24, 12)
+
     def __init__(
             self,
             pos: pygame.Vector2,
@@ -71,7 +74,8 @@ class Player(pygame.sprite.Sprite):
             animations: Mapping[Anim, Animation],
             collision_rects: Sequence[pygame.Rect] = (),
             gravity: float = 2000.0,
-            collision_size: tuple[int, int] = (24, 12),
+            jump_height: float = 120.0,
+            collision_size: tuple[int, int] = FEET_SIZE,
     ) -> None:
         super().__init__()
         self.animations = animations
@@ -80,6 +84,7 @@ class Player(pygame.sprite.Sprite):
         self.pos = pygame.Vector2(pos)
 
         self.gravity = gravity
+        self.jump_height = jump_height
 
         self.air_height = 0.0
         self.air_vel = 0.0
@@ -102,46 +107,43 @@ class Player(pygame.sprite.Sprite):
 
     def _move(self, move: pygame.Vector2, inp: Input, dt: float) -> None:
         speed = self.speed * 2 if inp.running else self.speed
-        delta = move * speed * dt
 
-        self.pos.x += delta.x
-        self._resolve_collisions(axis="x")
+        self.pos.x += move.x * speed * dt
+        self._resolve_collisions("x")
 
-        self.pos.y += delta.y
-        self._resolve_collisions(axis="y")
+        self.pos.y += move.y * speed * dt
+        self._resolve_collisions("y")
 
     def _collision_rect(self) -> pygame.Rect:
-        feet_width, feet_height = self.collision_size
-        return pygame.Rect(
-            int(self.pos.x - feet_width / 2),
-            int(self.pos.y - feet_height / 2),
-            feet_width,
-            feet_height,
-        )
+        w, h = self.collision_size
+        rect = pygame.Rect(0, 0, w, h)
+        rect.center = (round(self.pos.x), round(self.pos.y) + self.FEET_OFFSET)
+        return rect
 
     def _resolve_collisions(self, axis: str) -> None:
-        player_rect = self._collision_rect()
-
+        offset = pygame.Vector2(0, self.FEET_OFFSET)
+        rect = self._collision_rect()
         for wall in self.collision_rects:
-            if not player_rect.colliderect(wall):
+            if not rect.colliderect(wall):
                 continue
-
+            feet = pygame.Vector2(self.pos.x, self.pos.y) + offset
             if axis == "x":
-                if player_rect.centerx < wall.centerx:
-                    player_rect.right = wall.left
+                if feet.x < wall.centerx:
+                    rect.right = wall.left
                 else:
-                    player_rect.left = wall.right
-                self.pos.x = player_rect.centerx
-            else:  # axis == "y"
-                if player_rect.centery < wall.centery:
-                    player_rect.bottom = wall.top
+                    rect.left = wall.right
+                self.pos.x = rect.centerx
+            else:
+                if feet.y < wall.centery:
+                    rect.bottom = wall.top
                 else:
-                    player_rect.top = wall.bottom
-                self.pos.y = player_rect.centery
+                    rect.top = wall.bottom
+                self.pos.y = rect.centery - offset.y
 
     def _physics(self, inp: Input, dt: float) -> None:
         if inp.jump and not self.airborne:
-            self._jump()
+            self.air_vel = math.sqrt(2.0 * self.gravity * self.jump_height)
+            self.airborne = True
 
         if self.airborne:
             self.air_vel -= self.gravity * dt
@@ -151,36 +153,23 @@ class Player(pygame.sprite.Sprite):
                 self.air_vel = 0.0
                 self.airborne = False
 
-    def _jump(self) -> None:
-        self.air_vel = math.sqrt(2.0 * self.gravity * self.height)
-        self.airborne = True
-
-    @property
-    def height(self) -> float:
-        if self.rect.height > 1:
-            return float(self.rect.height)
-        for anim in self.animations.values():
-            if anim.frames:
-                return float(anim.frames[0].get_height())
-        return 64.0
-
     @property
     def depth(self) -> int:
-        return int(self.pos.y)
+        return int(self.pos.y + self.FEET_OFFSET)
 
     def _animate(self, move: pygame.Vector2, inp: Input, dt: float) -> None:
         moving = move.length_squared() > 0
 
-        self.play(self._pick_anim(moving, inp))
+        self._play(self._pick_anim(moving, inp))
         if moving:
             self.animations[self.current_anim].set_direction(inp.move_dir.value)
 
         frame = self.animations[self.current_anim].update(dt)
         if frame is not None:
             self.image = frame
-
-            render_pos = (self.pos.x, self.pos.y - self.air_height)
-            self.rect = self.image.get_rect(midbottom=render_pos)
+            self.rect = self.image.get_rect(
+                center=(self.pos.x, self.pos.y - self.air_height)
+            )
             self.mask = pygame.mask.from_surface(self.image)
 
     def _pick_anim(self, moving: bool, inp: Input) -> Anim:
@@ -194,7 +183,7 @@ class Player(pygame.sprite.Sprite):
             return Anim.RUN if inp.running else Anim.WALK
         return Anim.IDLE
 
-    def play(self, anim: Anim) -> None:
+    def _play(self, anim: Anim) -> None:
         if anim != self.current_anim:
             self.animations[anim].reset()
             self.current_anim = anim
