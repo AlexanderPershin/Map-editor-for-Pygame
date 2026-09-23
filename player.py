@@ -92,7 +92,6 @@ class Player(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(center=self.pos)
         self.mask = pygame.mask.from_surface(self.image)
 
-
     def update(self, dt: float, *args, **kwargs) -> None:
         inp = Input.capture()
         move = utils.get_movement_direction(inp.keys)
@@ -100,7 +99,6 @@ class Player(pygame.sprite.Sprite):
         self._move(move, inp, dt)
         self._physics(inp, dt)
         self._animate(move, inp, dt)
-
 
     def _move(self, move: pygame.Vector2, inp: Input, dt: float) -> None:
         speed = self.speed * 2 if inp.running else self.speed
@@ -134,13 +132,12 @@ class Player(pygame.sprite.Sprite):
                 else:
                     player_rect.left = wall.right
                 self.pos.x = player_rect.centerx
-            else:
+            else:  # axis == "y"
                 if player_rect.centery < wall.centery:
                     player_rect.bottom = wall.top
                 else:
                     player_rect.top = wall.bottom
                 self.pos.y = player_rect.centery
-
 
     def _physics(self, inp: Input, dt: float) -> None:
         if inp.jump and not self.airborne:
@@ -166,6 +163,10 @@ class Player(pygame.sprite.Sprite):
             if anim.frames:
                 return float(anim.frames[0].get_height())
         return 64.0
+
+    @property
+    def depth(self) -> int:
+        return int(self.pos.y)
 
     def _animate(self, move: pygame.Vector2, inp: Input, dt: float) -> None:
         moving = move.length_squared() > 0
