@@ -69,7 +69,9 @@ class Player(pygame.sprite.Sprite):
             pos: pygame.Vector2,
             speed: int,
             animations: Mapping[Anim, Animation],
+            collision_rects: Sequence[pygame.Rect] = (),
             gravity: float = 2000.0,
+            collision_size: tuple[int, int] = (24, 12),
     ) -> None:
         super().__init__()
         self.animations = animations
@@ -83,9 +85,13 @@ class Player(pygame.sprite.Sprite):
         self.air_vel = 0.0
         self.airborne = False
 
+        self.collision_rects = list(collision_rects)
+        self.collision_size = collision_size
+
         self.image = pygame.Surface((1, 1), pygame.SRCALPHA)
         self.rect = self.image.get_rect(center=self.pos)
         self.mask = pygame.mask.from_surface(self.image)
+
 
     def update(self, dt: float, *args, **kwargs) -> None:
         inp = Input.capture()
@@ -95,9 +101,46 @@ class Player(pygame.sprite.Sprite):
         self._physics(inp, dt)
         self._animate(move, inp, dt)
 
+
     def _move(self, move: pygame.Vector2, inp: Input, dt: float) -> None:
         speed = self.speed * 2 if inp.running else self.speed
-        self.pos += move * speed * dt
+        delta = move * speed * dt
+
+        self.pos.x += delta.x
+        self._resolve_collisions(axis="x")
+
+        self.pos.y += delta.y
+        self._resolve_collisions(axis="y")
+
+    def _collision_rect(self) -> pygame.Rect:
+        feet_width, feet_height = self.collision_size
+        return pygame.Rect(
+            int(self.pos.x - feet_width / 2),
+            int(self.pos.y - feet_height / 2),
+            feet_width,
+            feet_height,
+        )
+
+    def _resolve_collisions(self, axis: str) -> None:
+        player_rect = self._collision_rect()
+
+        for wall in self.collision_rects:
+            if not player_rect.colliderect(wall):
+                continue
+
+            if axis == "x":
+                if player_rect.centerx < wall.centerx:
+                    player_rect.right = wall.left
+                else:
+                    player_rect.left = wall.right
+                self.pos.x = player_rect.centerx
+            else:
+                if player_rect.centery < wall.centery:
+                    player_rect.bottom = wall.top
+                else:
+                    player_rect.top = wall.bottom
+                self.pos.y = player_rect.centery
+
 
     def _physics(self, inp: Input, dt: float) -> None:
         if inp.jump and not self.airborne:
@@ -136,7 +179,7 @@ class Player(pygame.sprite.Sprite):
             self.image = frame
 
             render_pos = (self.pos.x, self.pos.y - self.air_height)
-            self.rect = self.image.get_rect(center=render_pos)
+            self.rect = self.image.get_rect(midbottom=render_pos)
             self.mask = pygame.mask.from_surface(self.image)
 
     def _pick_anim(self, moving: bool, inp: Input) -> Anim:

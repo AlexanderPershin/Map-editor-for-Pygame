@@ -1,4 +1,6 @@
 import pygame
+import pytmx
+from pytmx.util_pygame import load_pygame
 
 import utils
 from config import Config
@@ -25,6 +27,21 @@ class Game:
 
         self.screen = pygame.display.set_mode((self.config.window_width, self.config.window_height))
 
+        self.tmx_data = load_pygame("map/my_map.tmx")
+
+        self.collision_layer = self.tmx_data.get_layer_by_name("Collisions")
+        self.collision_rects = []
+
+        if self.collision_layer:
+            for obj in self.collision_layer:
+                rect = pygame.Rect(
+                    obj.x,
+                    obj.y,
+                    obj.width,
+                    obj.height,
+                )
+                self.collision_rects.append(rect)
+
         self.screen_width, self.screen_height = self.screen.get_size()
         self.screen_rect = self.screen.get_rect()
 
@@ -44,6 +61,7 @@ class Game:
             ),
             300,
             self.player_animations,
+            self.collision_rects,
         )
         self.all_sprites.add(self.player)
 
@@ -88,7 +106,15 @@ class Game:
             self.all_sprites.change_layer(s, s.rect.centery)
 
     def draw(self):
-        self.screen.fill(self.config.bg_color)
+        # TODO: Put each object from Things layer into sprite and render it accorting to centery see update
+        # Collisions make by Collisions layer
+        for layer in self.tmx_data.visible_layers:
+            if isinstance(layer, pytmx.TiledTileLayer):
+                for x, y, gid in layer:
+                    tile_image = self.tmx_data.get_tile_image_by_gid(gid)
+                    if tile_image:
+                        self.screen.blit(tile_image, (x * self.tmx_data.tilewidth,
+                                                 y * self.tmx_data.tileheight))
 
         self.all_sprites.draw(self.screen)
 
