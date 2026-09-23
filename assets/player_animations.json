@@ -1,0 +1,58 @@
+{
+  "idle": {
+    "file": "images/player/idle.png",
+    "frame_width": 64,
+    "frame_height": 64,
+    "frame_count": 2,
+    "rows": 4,
+    "frame_duration": 150
+  },
+  "walk": {
+    "file": "images/player/walk.png",
+    "frame_width": 64,
+    "frame_height": 64,
+    "frame_count": 9,
+    "rows": 4,
+    "frame_duration": 150
+  },
+  "run": {
+    "file": "images/player/run.png",
+    "frame_width": 64,
+    "frame_height": 64,
+    "frame_count": 8,
+    "rows": 4,
+    "frame_duration": 150
+  },
+  "jump": {
+    "file": "images/player/jump.png",
+    "frame_width": 64,
+    "frame_height": 64,
+    "frame_count": 5,
+    "rows": 4,
+    "frame_duration": 150
+  },
+  "slash": {
+    "file": "images/player/slash_128.png",
+    "frame_width": 128,
+    "frame_height": 128,
+    "frame_count": 6,
+    "rows": 4,
+    "frame_duration": 25
+  },
+  "backslash": {
+    "file": "images/player/backslash_128.png",
+    "frame_width": 128,
+    "frame_height": 128,
+    "frame_count": 13,
+    "rows": 4,
+    "frame_duration": 25
+  },
+  "spellcast": {
+    "file": "images/player/spellcast.png",
+    "frame_width": 64,
+    "frame_height": 64,
+    "frame_count": 7,
+    "rows": 4,
+    "frame_duration": 25
+  }
+}

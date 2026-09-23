@@ -1,0 +1,12 @@
+[project]
+name = "map-editor-stepik"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "pydantic>=2.13.5",
+    "pygame-ce>=2.5.8",
+    "pytmx>=3.32",
+    "typer>=0.27.2",
+]
